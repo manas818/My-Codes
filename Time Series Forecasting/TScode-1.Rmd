@@ -1,0 +1,202 @@
+---
+title: "R Notebook"
+output:
+  word_document: default
+  html_notebook: default
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+options(repos=c(CRAN="http://cran.rstudio.com"))
+install.packages("forecast")
+library(forecast)
+
+# Reading the data from the forecast package
+
+data("gas")
+View(gas)
+
+# Checking for any NA 
+
+sum(is.na(gas))
+
+# Exploratory data analysis
+
+class(gas)
+
+start(gas)
+
+end(gas)
+
+frequency(gas)
+
+cycle(gas)
+
+summary(gas)
+
+str(gas)
+
+# Plot of the time series data
+
+plot(gas)
+monthplot(gas)
+seasonplot(gas)
+
+boxplot(gas~cycle(gas))
+
+# Taking the subset of the data as the entire data is irrelevant
+
+gas1<- window(gas, start=c(1985,1), end=c(1995,8))
+plot(gas1)
+
+# Decompose the data
+
+gas_data_const <- stl(gas, s.window = "p")
+plot(gas_data_const)
+
+gas_data <- stl(gas, s.window = 5)
+plot(gas_data)
+
+# Taking log of the series to make the variance constant
+
+log_gas <- log(gas1)
+plot(log_gas)
+
+# Augmented Dickey Fuller Test
+
+install.packages("tseries")
+library(tseries)
+
+gas_augdf <- adf.test(log_gas, alternative = "stationary")
+gas_augdf
+
+
+# Differencing to address the trend in the series
+
+gas_difference <- diff(log_gas, differences = 1)
+plot(gas_difference)
+gas_adf <- adf.test(gas_difference, alternative = "stationary")
+gas_adf
+
+# Now the series is stationary with p-value = 0.01
+
+# ACF and PACF plots
+
+acf(log_gas, lag.max = 20)
+pacf(log_gas, lag.max = 20)
+
+# ACF and PACF plots on differeced series
+
+acf(gas_difference, lag.max = 20)
+pacf(gas_difference, lag.max = 20)
+
+
+# Deseasonalise the data
+
+deseason_gas <- (gas_data$time.series[,2] + gas_data$time.series[,3])
+plot <- ts.plot(deseason_gas, log_gas, col = c("red", "blue"), main = "Comparision plot")
+
+# Dividing the series into train and test
+
+gas_train = window(log_gas, start=c(1985,1), end=c(1992,12))
+gas_test= window(log_gas, start=c(1993,1), end=c(1995,8))
+
+# ARIMA Model on train data (checking with various SAR and SMA components)
+
+arima_train <- arima(gas_train, order = c(2,1,2), seasonal = c(0,1,0))
+arima_train
+Box.test(arima_train$residuals, lag = 20, type = "Ljung-Box")
+
+arima_train <- arima(gas_train, order = c(2,1,2), seasonal = c(1,1,0))
+arima_train
+Box.test(arima_train$residuals, lag = 20, type = "Ljung-Box")
+
+arima_train <- arima(gas_train, order = c(2,1,2), seasonal = c(0,1,1))
+arima_train
+Box.test(arima_train$residuals, lag = 20, type = "Ljung-Box")
+
+arima_train <- arima(gas_train, order = c(2,1,2), seasonal = c(1,1,1))
+arima_train
+Box.test(arima_train$residuals, lag = 20, type = "Ljung-Box")
+
+arima_train <- arima(gas_train, order = c(2,1,2), seasonal = c(2,1,0))
+arima_train
+Box.test(arima_train$residuals, lag = 20, type = "Ljung-Box")
+
+arima_train <- arima(gas_train, order = c(2,1,2), seasonal = c(2,1,1))
+arima_train
+Box.test(arima_train$residuals, lag = 20, type = "Ljung-Box")
+
+arima_train <- arima(gas_train, order = c(2,1,2), seasonal = c(2,1,2))
+arima_train
+Box.test(arima_train$residuals, lag = 20, type = "Ljung-Box")
+
+arima_train <- arima(gas_train, order = c(2,1,2), seasonal = c(0,1,2))
+arima_train
+Box.test(arima_train$residuals, lag = 20, type = "Ljung-Box")
+
+arima_train <- arima(gas_train, order = c(2,1,2), seasonal = c(1,1,2))
+arima_train
+Box.test(arima_train$residuals, lag = 20, type = "Ljung-Box")
+
+
+# The best model obtained with SAR = 2 and SMA = 2
+
+arima_train <- arima(gas_train, order = c(2,1,2), seasonal = c(2,1,2))
+arima_train
+hist(arima_train$residuals, col = "red")
+arima_train_fit <- fitted(arima_train)
+ts.plot(gas_train,arima_train_fit, col = c("blue", "red"))
+tsdisplay(residuals(arima_train), lag.max = 20, main = 'Model Residuals')
+
+# Box Test
+
+Box.test(arima_train$residuals, lag = 20, type = "Ljung-Box")
+
+
+# Auto ARIMA on train data
+
+autoarima_train <- auto.arima(gas_train, seasonal = TRUE)
+autoarima_train
+autoarima_train_fit <- fitted(autoarima_train)
+ts.plot(gas_train,autoarima_train_fit, col = c("blue", "red"))
+tsdisplay(residuals(autoarima_train), lag.max = 20, main = 'Model Residuals')
+
+# Box Test on auto arima
+
+Box.test(autoarima_train$residuals, lag = 20, type = "Ljung-Box")
+
+# Forecast on train data
+
+gas_train_autofc <- forecast(autoarima_train, h = 12)
+plot(gas_train_autofc)
+
+# Accuracy
+
+accuracy <- accuracy(gas_train_autofc, gas_test)
+accuracy
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
